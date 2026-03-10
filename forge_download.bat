@@ -122,5 +122,5 @@ exit /b 0
 
 :run_server
     echo [INFO] 启动Forge服务器...
-    java !FORGE_JAVA_ARGS! -jar forge-!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!-universal.jar nogui
+    ./run.bat
     exit /b 0
