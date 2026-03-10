@@ -83,7 +83,7 @@ exit /b 0
 
 :download_forge_installer
     echo [INFO] 从BMCLAPI获取Forge真实下载地址...
-    :: ========== 修复1：PowerShell输出重定向到nul，仅保留错误码传递 ==========
+    :: ========== 最小化修改1：新增失效域名替换 ==========
     powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $req.UserAgent = 'Mozilla/5.0'; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); $res.Close(); if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } $realUrl = $realUrl -replace 'mirrors.ppuc.lol', 'bmclapi2.bangbang93.com'; [Console]::WriteLine('[INFO] BMCLAPI真实下载地址：' + $realUrl); Invoke-WebRequest -Uri $realUrl -OutFile '!FORGE_INSTALLER_NAME!' -UserAgent 'Mozilla/5.0' -TimeoutSec 30; [Console]::WriteLine('[SUCCESS] BMCLAPI下载完成：' + '!FORGE_INSTALLER_NAME!'); exit 0; } catch { [Console]::WriteLine('[ERROR] BMCLAPI调用失败：' + $_.Exception.Message); exit 1; }" > temp.log 2>&1
     
     :: 打印PowerShell日志（避免中文拆分）
@@ -96,9 +96,9 @@ exit /b 0
         exit /b 0
     )
 
-    :: ========== 修复2：官方源同样处理输出，避免中文拆分 ==========
+    :: ========== 最小化修改2：简化官方源下载逻辑，添加UserAgent和超时 ==========
     echo [INFO] BMCLAPI下载失败，尝试官方源...
-    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_OFFICIAL_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); [Console]::WriteLine('[INFO] 官方源真实地址：' + $realUrl); $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); exit 0; } catch { [Console]::WriteLine('[ERROR] 官方源下载失败：' + $_.Exception.Message); exit 1; }" > temp.log 2>&1
+    powershell -Command "$ErrorActionPreference='Stop'; try { Invoke-WebRequest -Uri '!FORGE_OFFICIAL_URL!' -OutFile '!FORGE_INSTALLER_NAME!' -UserAgent 'Mozilla/5.0' -TimeoutSec 30 -MaximumRedirection 5; [Console]::WriteLine('[SUCCESS] 官方源下载完成：' + '!FORGE_INSTALLER_NAME!'); exit 0; } catch { [Console]::WriteLine('[ERROR] 官方源下载失败：' + $_.Exception.Message); exit 1; }" > temp.log 2>&1
     
     :: 打印官方源日志
     type temp.log
