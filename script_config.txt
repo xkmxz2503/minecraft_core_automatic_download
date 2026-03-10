@@ -5,9 +5,6 @@ TARGET_CORE=fabric
 FORGE_MINECRAFT_VERSION=1.21.1
 FORGE_VERSION=48.1.0
 FORGE_JAVA_ARGS=-Xmx2G
-# BMCLAPI优先，官方源兜底
-FORGE_BMCLAPI_URL=https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/%MINECRAFT_VERSION%-%FORGE_VERSION%/forge-%MINECRAFT_VERSION%-%FORGE_VERSION%-installer.jar
-FORGE_OFFICIAL_URL=https://files.minecraftforge.net/maven/net/minecraftforge/forge/%MINECRAFT_VERSION%-%FORGE_VERSION%/forge-%MINECRAFT_VERSION%-%FORGE_VERSION%-installer.jar
 
 # Fabric配置
 FABRIC_MINECRAFT_VERSION=1.21.1
