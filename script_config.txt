@@ -1,0 +1,9 @@
+# 全局配置
+# 核心类型（forge/neoforge/fabric）
+CORE_TYPE=forge
+# Minecraft版本
+MC_VERSION=1.20.1
+# Forge版本（例如47.1.0）/NeoForge版本（例如20.1.106）/Fabric Loader版本（例如0.15.11）
+MOD_LOADER_VERSION=47.1.0
+# 优先使用BMCLAPI（true/false）
+PREFER_BMCLAPI=true
