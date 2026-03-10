@@ -52,15 +52,23 @@ exit /b 0
 
 :: ----------------------- 函数定义 -----------------------
 :load_config
-    :: 读取配置文件
-    for /f "tokens=1,2 delims==" %%a in (script_config.txt) do (
+    :: 1. 读取配置文件（仅纯参数，无URL模板）
+    for /f "tokens=1,2 delims== eol=#" %%a in (script_config.txt) do (
         set "%%a=%%b"
     )
-    :: 替换变量占位符
-    set "FORGE_BMCLAPI_URL=!FORGE_BMCLAPI_URL:%MINECRAFT_VERSION%=%FORGE_MINECRAFT_VERSION%!"
-    set "FORGE_BMCLAPI_URL=!FORGE_BMCLAPI_URL:%FORGE_VERSION%=%FORGE_VERSION%!"
-    set "FORGE_OFFICIAL_URL=!FORGE_OFFICIAL_URL:%MINECRAFT_VERSION%=%FORGE_MINECRAFT_VERSION%!"
-    set "FORGE_OFFICIAL_URL=!FORGE_OFFICIAL_URL:%FORGE_VERSION%=%FORGE_VERSION%!"
+
+    :: 2. 脚本内封装BMCLAPI相关配置（核心：拆分基础域名和接口地址）
+    set "BMCLAPI_DOMAIN=https://bmclapi2.bangbang93.com"  :: BMCLAPI主域名（用于拼接相对路径）
+    set "BMCLAPI_API_URL=!BMCLAPI_DOMAIN!/forge/download"  :: BMCLAPI下载接口地址
+    :: 拼接带参数的BMCLAPI请求URL
+    set "FORGE_BMCLAPI_URL=!BMCLAPI_API_URL!?mcversion=!FORGE_MINECRAFT_VERSION!&version=!FORGE_VERSION!&category=installer&format=jar"
+    if defined FORGE_BRANCH set "FORGE_BMCLAPI_URL=!FORGE_BMCLAPI_URL!&branch=!FORGE_BRANCH!"
+
+    :: 3. 拼接官方源URL
+    set "FORGE_OFFICIAL_URL=https://files.minecraftforge.net/maven/net/minecraftforge/forge/!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!/forge-!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!-installer.jar"
+
+    :: 4. 定义版本化安装器文件名
+    set "FORGE_INSTALLER_NAME=forge-!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!-installer.jar"
     exit /b 0
 
 :check_core_match
@@ -75,23 +83,34 @@ exit /b 0
     exit /b 1
 
 :download_forge_installer
-    :: 优先BMCLAPI下载
-    echo [INFO] 从BMCLAPI下载Forge安装器...
-    powershell -Command "(New-Object System.Net.WebClient).DownloadFile('!FORGE_BMCLAPI_URL!', 'forge-installer.jar')"
-    if exist "forge-installer.jar" exit /b 0
+    :: ========== 修复1：处理BMCLAPI相对路径 + 修复命令换行 ==========
+    echo [INFO] 从BMCLAPI获取Forge真实下载地址...
+    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); Write-Host '[INFO] BMCLAPI返回相对地址：' $realUrl; if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } Write-Host '[INFO] BMCLAPI完整下载地址：' $realUrl; $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); } catch { Write-Host '[ERROR] BMCLAPI下载失败：' $_.Exception.Message -ForegroundColor Red; exit 1 }" 2>nul
+    
+    :: 检查是否下载成功
+    if exist "!FORGE_INSTALLER_NAME!" (
+        echo [SUCCESS] BMCLAPI下载完成，文件：!FORGE_INSTALLER_NAME!
+        exit /b 0
+    )
 
-    :: 兜底官方源
+    :: ========== 修复2：彻底修复echo换行，避免命令识别错误 ==========
     echo [INFO] BMCLAPI下载失败，尝试官方源...
-    powershell -Command "(New-Object System.Net.WebClient).DownloadFile('!FORGE_OFFICIAL_URL!', 'forge-installer.jar')"
-    if exist "forge-installer.jar" exit /b 0
+    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_OFFICIAL_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); Write-Host '[INFO] 官方源真实地址：' $realUrl; $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); } catch { Write-Host '[ERROR] 官方源下载失败：' $_.Exception.Message -ForegroundColor Red; exit 1 }" 2>nul
+    
+    :: 检查是否下载成功
+    if exist "!FORGE_INSTALLER_NAME!" (
+        echo [SUCCESS] 官方源下载完成，文件：!FORGE_INSTALLER_NAME!
+        exit /b 0
+    )
+
+    echo [ERROR] 所有源均下载失败
     exit /b 1
 
 :install_forge_core
     echo [INFO] 安装Forge核心...
-    java -jar forge-installer.jar --installServer
+    java -jar !FORGE_INSTALLER_NAME! --installServer
     if !ERRORLEVEL! neq 0 exit /b 1
-    :: 删除安装器
-    del /f /q forge-installer.jar
+    del /f /q !FORGE_INSTALLER_NAME!
     exit /b 0
 
 :run_server
