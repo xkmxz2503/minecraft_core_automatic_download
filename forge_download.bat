@@ -57,14 +57,13 @@ exit /b 0
         set "%%a=%%b"
     )
 
-    :: 2. BMCLAPI配置（核心修复：加回category和format参数）
+    :: 2. BMCLAPI配置
     set "BMCLAPI_DOMAIN=https://bmclapi2.bangbang93.com"
     set "BMCLAPI_API_URL=!BMCLAPI_DOMAIN!/forge/download"
-    :: 必须传入category=installer和format=jar，否则地址会出现undefined
     set "FORGE_BMCLAPI_URL=!BMCLAPI_API_URL!?mcversion=!FORGE_MINECRAFT_VERSION!&version=!FORGE_VERSION!&category=installer&format=jar"
     if defined FORGE_BRANCH set "FORGE_BMCLAPI_URL=!FORGE_BMCLAPI_URL!&branch=!FORGE_BRANCH!"
 
-    :: 3. 官方源URL（保留原有逻辑）
+    :: 3. 官方源URL
     set "FORGE_OFFICIAL_URL=https://files.minecraftforge.net/maven/net/minecraftforge/forge/!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!/forge-!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!-installer.jar"
 
     :: 4. 安装器文件名
@@ -83,9 +82,13 @@ exit /b 0
     exit /b 1
 
 :download_forge_installer
-    :: ========== BMCLAPI调用（单行化PowerShell，加回关键参数） ==========
     echo [INFO] 从BMCLAPI获取Forge真实下载地址...
-    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $req.UserAgent = 'Mozilla/5.0'; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); $res.Close(); if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } Write-Host '[INFO] BMCLAPI真实下载地址：' $realUrl; Invoke-WebRequest -Uri $realUrl -OutFile '!FORGE_INSTALLER_NAME!' -UserAgent 'Mozilla/5.0' -TimeoutSec 30; Write-Host '[SUCCESS] BMCLAPI下载完成：!FORGE_INSTALLER_NAME!'; } catch { Write-Host '[ERROR] BMCLAPI调用失败：' $_.Exception.Message -ForegroundColor Red; exit 1; }" 2>nul
+    :: ========== 修复1：PowerShell输出重定向到nul，仅保留错误码传递 ==========
+    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $req.UserAgent = 'Mozilla/5.0'; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); $res.Close(); if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } $realUrl = $realUrl -replace 'mirrors.ppuc.lol', 'bmclapi2.bangbang93.com'; [Console]::WriteLine('[INFO] BMCLAPI真实下载地址：' + $realUrl); Invoke-WebRequest -Uri $realUrl -OutFile '!FORGE_INSTALLER_NAME!' -UserAgent 'Mozilla/5.0' -TimeoutSec 30; [Console]::WriteLine('[SUCCESS] BMCLAPI下载完成：' + '!FORGE_INSTALLER_NAME!'); exit 0; } catch { [Console]::WriteLine('[ERROR] BMCLAPI调用失败：' + $_.Exception.Message); exit 1; }" > temp.log 2>&1
+    
+    :: 打印PowerShell日志（避免中文拆分）
+    type temp.log
+    del /f /q temp.log > nul 2>&1
     
     :: 检查BMCLAPI下载结果
     if exist "!FORGE_INSTALLER_NAME!" (
@@ -93,9 +96,13 @@ exit /b 0
         exit /b 0
     )
 
-    :: 官方源逻辑（保留原有单行化格式）
+    :: ========== 修复2：官方源同样处理输出，避免中文拆分 ==========
     echo [INFO] BMCLAPI下载失败，尝试官方源...
-    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_OFFICIAL_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); Write-Host '[INFO] 官方源真实地址：' $realUrl; $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); } catch { Write-Host '[ERROR] 官方源下载失败：' $_.Exception.Message -ForegroundColor Red; exit 1; }" 2>nul
+    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_OFFICIAL_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); [Console]::WriteLine('[INFO] 官方源真实地址：' + $realUrl); $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); exit 0; } catch { [Console]::WriteLine('[ERROR] 官方源下载失败：' + $_.Exception.Message); exit 1; }" > temp.log 2>&1
+    
+    :: 打印官方源日志
+    type temp.log
+    del /f /q temp.log > nul 2>&1
     
     :: 最终检查
     if exist "!FORGE_INSTALLER_NAME!" (
