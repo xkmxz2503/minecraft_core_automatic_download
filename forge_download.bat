@@ -84,7 +84,7 @@ exit /b 0
 :download_forge_installer
     echo [INFO] 从BMCLAPI获取Forge真实下载地址...
     :: ========== 最小化修改1：新增失效域名替换 ==========
-    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $req.UserAgent = 'Mozilla/5.0'; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); $res.Close(); if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } $realUrl = $realUrl -replace 'mirrors.ppuc.lol', 'bmclapi2.bangbang93.com'; [Console]::WriteLine('[INFO] BMCLAPI真实下载地址：' + $realUrl); Invoke-WebRequest -Uri $realUrl -OutFile '!FORGE_INSTALLER_NAME!' -UserAgent 'Mozilla/5.0' -TimeoutSec 30; [Console]::WriteLine('[SUCCESS] BMCLAPI下载完成：' + '!FORGE_INSTALLER_NAME!'); exit 0; } catch { [Console]::WriteLine('[ERROR] BMCLAPI调用失败：' + $_.Exception.Message); exit 1; }" > temp.log 2>&1
+    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $req.UserAgent = 'Mozilla/5.0'; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); $res.Close(); if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } $realUrl = $realUrl -replace 'mirrors.ppuc.lol', 'bmclapi2.bangbang93.com'; [Console]::WriteLine('[INFO] BMCLAPI真实下载地址：' + $realUrl); curl.exe -L -o '!FORGE_INSTALLER_NAME!' $realUrl; [Console]::WriteLine('[SUCCESS] BMCLAPI下载完成：' + '!FORGE_INSTALLER_NAME!'); exit 0; } catch { [Console]::WriteLine('[ERROR] BMCLAPI调用失败：' + $_.Exception.Message); exit 1; }" > temp.log 2>&1
     
     :: 打印PowerShell日志（避免中文拆分）
     type temp.log
