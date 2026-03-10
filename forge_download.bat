@@ -52,22 +52,22 @@ exit /b 0
 
 :: ----------------------- 函数定义 -----------------------
 :load_config
-    :: 1. 读取配置文件（仅纯参数，无URL模板）
+    :: 1. 读取配置文件
     for /f "tokens=1,2 delims== eol=#" %%a in (script_config.txt) do (
         set "%%a=%%b"
     )
 
-    :: 2. 脚本内封装BMCLAPI相关配置（核心：拆分基础域名和接口地址）
-    set "BMCLAPI_DOMAIN=https://bmclapi2.bangbang93.com"  :: BMCLAPI主域名（用于拼接相对路径）
-    set "BMCLAPI_API_URL=!BMCLAPI_DOMAIN!/forge/download"  :: BMCLAPI下载接口地址
-    :: 拼接带参数的BMCLAPI请求URL
+    :: 2. BMCLAPI配置（核心修复：加回category和format参数）
+    set "BMCLAPI_DOMAIN=https://bmclapi2.bangbang93.com"
+    set "BMCLAPI_API_URL=!BMCLAPI_DOMAIN!/forge/download"
+    :: 必须传入category=installer和format=jar，否则地址会出现undefined
     set "FORGE_BMCLAPI_URL=!BMCLAPI_API_URL!?mcversion=!FORGE_MINECRAFT_VERSION!&version=!FORGE_VERSION!&category=installer&format=jar"
     if defined FORGE_BRANCH set "FORGE_BMCLAPI_URL=!FORGE_BMCLAPI_URL!&branch=!FORGE_BRANCH!"
 
-    :: 3. 拼接官方源URL
+    :: 3. 官方源URL（保留原有逻辑）
     set "FORGE_OFFICIAL_URL=https://files.minecraftforge.net/maven/net/minecraftforge/forge/!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!/forge-!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!-installer.jar"
 
-    :: 4. 定义版本化安装器文件名
+    :: 4. 安装器文件名
     set "FORGE_INSTALLER_NAME=forge-!FORGE_MINECRAFT_VERSION!-!FORGE_VERSION!-installer.jar"
     exit /b 0
 
@@ -83,21 +83,21 @@ exit /b 0
     exit /b 1
 
 :download_forge_installer
-    :: ========== 修复1：处理BMCLAPI相对路径 + 修复命令换行 ==========
+    :: ========== BMCLAPI调用（单行化PowerShell，加回关键参数） ==========
     echo [INFO] 从BMCLAPI获取Forge真实下载地址...
-    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); Write-Host '[INFO] BMCLAPI返回相对地址：' $realUrl; if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } Write-Host '[INFO] BMCLAPI完整下载地址：' $realUrl; $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); } catch { Write-Host '[ERROR] BMCLAPI下载失败：' $_.Exception.Message -ForegroundColor Red; exit 1 }" 2>nul
+    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_BMCLAPI_URL!'); $req.AllowAutoRedirect = $false; $req.UserAgent = 'Mozilla/5.0'; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); $res.Close(); if ($realUrl -match '^/') { $realUrl = '!BMCLAPI_DOMAIN!' + $realUrl; } Write-Host '[INFO] BMCLAPI真实下载地址：' $realUrl; Invoke-WebRequest -Uri $realUrl -OutFile '!FORGE_INSTALLER_NAME!' -UserAgent 'Mozilla/5.0' -TimeoutSec 30; Write-Host '[SUCCESS] BMCLAPI下载完成：!FORGE_INSTALLER_NAME!'; } catch { Write-Host '[ERROR] BMCLAPI调用失败：' $_.Exception.Message -ForegroundColor Red; exit 1; }" 2>nul
     
-    :: 检查是否下载成功
+    :: 检查BMCLAPI下载结果
     if exist "!FORGE_INSTALLER_NAME!" (
         echo [SUCCESS] BMCLAPI下载完成，文件：!FORGE_INSTALLER_NAME!
         exit /b 0
     )
 
-    :: ========== 修复2：彻底修复echo换行，避免命令识别错误 ==========
+    :: 官方源逻辑（保留原有单行化格式）
     echo [INFO] BMCLAPI下载失败，尝试官方源...
-    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_OFFICIAL_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); Write-Host '[INFO] 官方源真实地址：' $realUrl; $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); } catch { Write-Host '[ERROR] 官方源下载失败：' $_.Exception.Message -ForegroundColor Red; exit 1 }" 2>nul
+    powershell -Command "$ErrorActionPreference='Stop'; try { $req = [System.Net.HttpWebRequest]::Create('!FORGE_OFFICIAL_URL!'); $req.AllowAutoRedirect = $false; $res = $req.GetResponse(); $realUrl = $res.GetResponseHeader('Location'); Write-Host '[INFO] 官方源真实地址：' $realUrl; $wc = New-Object System.Net.WebClient; $wc.DownloadFile($realUrl, '!FORGE_INSTALLER_NAME!'); } catch { Write-Host '[ERROR] 官方源下载失败：' $_.Exception.Message -ForegroundColor Red; exit 1; }" 2>nul
     
-    :: 检查是否下载成功
+    :: 最终检查
     if exist "!FORGE_INSTALLER_NAME!" (
         echo [SUCCESS] 官方源下载完成，文件：!FORGE_INSTALLER_NAME!
         exit /b 0
